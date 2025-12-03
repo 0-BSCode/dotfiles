@@ -1,15 +1,15 @@
 {
   description = "Devtools";
- 
   # Flake inputs
   inputs = {
     # Latest unstable Nixpkgs
     nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1";
+    # Rust overlay
+    rust-overlay.url = "github:oxalica/rust-overlay";
   };
- 
   # Flake outputs
   outputs =
-    { self, nixpkgs }:
+    { self, nixpkgs, rust-overlay }:
     let
       # Systems supported
       allSystems = [
@@ -18,31 +18,36 @@
         "x86_64-darwin" # 64-bit Intel macOS
         "aarch64-darwin" # 64-bit ARM macOS
       ];
- 
       # Helper to provide system-specific attributes
       forAllSystems =
         f:
         nixpkgs.lib.genAttrs allSystems (
           system:
           f {
-            pkgs = import nixpkgs { inherit system; };
+            pkgs = import nixpkgs { inherit system; overlays = [rust-overlay.overlays.default]; };
           }
         );
     in
     {
       # Development environment output
       devShells = forAllSystems (
-        { pkgs }:
-        {
+        { pkgs }: 
+	let 
+	  rust = pkgs.rust-bin.stable.latest.default;
+        in {
           default = pkgs.mkShell {
             # The Nix packages provided in the environment
             packages = with pkgs; [
               nodejs
               pnpm
-	     bun
+ 	      bun
               uv
               go
+              rust
             ];
+            shellHook = ''
+              export RUST_SRC_PATH="${rust}/lib/rustlib/src/rust/library"
+            '';
           };
         }
       );
